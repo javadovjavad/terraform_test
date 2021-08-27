@@ -1,0 +1,64 @@
+# Build Webserver during Bootstrap
+#
+# Made by Javad J.
+
+
+resource "aws_instance" "webserver1" {
+	ami = "ami-0443305dabd4be2bc"
+	instance_type	= "t2.micro"
+	#vpc_security_group_ids = ["sg-1111111"]
+	vpc_security_group_ids = [aws_security_group.webserver1.id]
+	user_data = <<EOF
+#!/bin/bash
+yum -y update
+yum -y install httpd
+myip=`curl http://169.254.169.254/latest/meta-data/local-ipv4`
+echo "<h2>My Webserver ip: $myip </h2><br>Build by Terraform! wiht me" > /var/www/html/index.html
+sudo service httpd start
+chkconfig httpd on
+EOF
+}
+
+#----------------------
+locals {
+  ports_in = [
+    443,
+    80,
+    22
+  ]
+  ports_out = [
+    0
+  ]
+}
+
+resource "aws_security_group" "webserver1" {
+  name        = "allow_http"
+  description = "Allow HTTP inbound traffic"
+  vpc_id      = "vpc-1868e773"
+
+  dynamic "ingress" {
+    for_each = toset(local.ports_in)
+    content {
+      description      = "HTTPS from VPC"
+      from_port        = ingress.value
+      to_port          = ingress.value
+      protocol         = "tcp"
+      cidr_blocks      = ["0.0.0.0/0"]
+    }
+  }
+
+  dynamic "egress" {
+    for_each = toset(local.ports_out)
+    content {
+      from_port        = egress.value
+      to_port          = egress.value
+      protocol         = "-1"
+      cidr_blocks      = ["0.0.0.0/0"]
+    }
+  }
+}
+
+#---------------------------
+
+
+
